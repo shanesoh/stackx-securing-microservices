@@ -34,7 +34,7 @@ Thus **Open Policy Agent (OPA)** and **Envoy**
 
 # What is OPA?
 
-Open Policy Agent is a lightweight general-purpose **policy engine** that lets you specify policy as code and use APIs
+Open Policy Agent is a lightweight general-purpose policy engine that lets you specify **policy as code** and use APIs
 to **offload policy decision-making** from your software.
 
 .center.image-60[![](./images/opa-service.svg)]
@@ -71,6 +71,9 @@ based on OPA's policy decisions.
 `docker-compose.yml`
 ```yaml
 ...
+  app:
+    image: kennethreitz/httpbin:latest
+
   envoy:
     build: ./compose/envoy
     ports:
@@ -81,15 +84,12 @@ based on OPA's policy decisions.
       - DEBUG_LEVEL=info
       - SERVICE_NAME=app  # should match name of underlying service
       - SERVICE_PORT=80
-
-  app:
-    image: kennethreitz/httpbin:latest
 ...
 ```
 
+* httpbin as a mock service
 * Built Envoy image does environment variable substitution for `envoy.yaml`
     * To simplify adoption as Envoy config can be rather complex
-* httpbin as a mock service
 
 ---
 
@@ -140,7 +140,7 @@ allow = response {
   }
 }
 ```
-* Policy decision can be boolean or an object (as in this case)
+* Policy decision can be boolean or an object 
 * Toy policy to only allow GET requests and add additional header for `X-Auth-User`
 
 ---
@@ -163,8 +163,11 @@ $ curl -X GET http://localhost:8080/anything
   "method": "GET", 
 }
 
-# This gets denied
-$ curl -X POST http://localhost:8080/anything
+# This is denied
+$ curl -X POST http://localhost:8080/anything -v
+...
+< HTTP/1.1 403 Forbidden
+...
 ```
 
 ---
@@ -183,7 +186,7 @@ default allow = false
 token = payload {
   # Access token in `Authorization: Bearer <token>` header
   [_, encoded] := split(http_request.headers.authorization, " ")
-  [_, payload, _] := io.jwt.decode(encoded)
+  [_, token, _] := io.jwt.decode(encoded)
 }
 
 allow = response {
@@ -207,7 +210,7 @@ allow = response {
 
 --
 
-Ongoing effort to move various Excel and CSV files into a headless CMS, which provides
+Ongoing effort to move various Excel and CSV files into a headless Content Management System (CMS), which provides
 
 1. a UI for managing content in an underlying database
 2. a set of APIs for services to interact programmatically with the database
@@ -244,7 +247,7 @@ We could write an OPA policy to secure access to those APIs
 allow = response {
   token.resource_access["articles-service"].roles[_] == "read"
   http_request.method == "GET"
-  glob.match("/items/articles/*", ["/"], http.path)
+  glob.match("/items/articles/*", ["/"], http_request.path)
 
   response := {
       "allowed": true
@@ -255,7 +258,7 @@ allow = response {
 allow = response {
   token.resource_access["articles-service"].roles[_] == "write"
   http_request.method == "POST"
-  glob.match("/items/articles", ["/"], http.path)
+  glob.match("/items/articles", ["/"], http_request.path)
 
   response := {
       "allowed": true
@@ -280,15 +283,19 @@ allow = response {
     * Authorization logic written outside of service instead of it peppered all over the code
         * Separation of concerns: Developers focus on writing application logic assuming authorization is handled
     * Policies can be reloaded without restarting underlying service
-    * Facilitates discoverability, reuse and governance
 
 --
 
 * Centralised management APIs
     * Policy distribution via bundles APIs
         * Especially universal policies
-    * Collection of telemetry 
-        * e.g. Decision logs (that are clearly separated from application logs)
+    * Collection of decision logs 
+        * That are clearly separated from application logs
+
+???
+
+* Policy distribution: Perhaps ITSec can write policies as code and impose them by distributing the OPA policies
+* Collection of decision logs: Useful for audit and SOC functions
 
 ---
 
@@ -301,11 +308,8 @@ allow = response {
 --
 
 * Purpose-built for sidecar usage
-    * Completely agnostic to upstream service
-        * With OPA, useful for tacking on access control to services that don't have them
-    * Containerised for Docker or k8s
-        * At the same time easy to run on the host for legacy applications
-        * Possible to auto inject as k8s sidecars 
+    * Possible to auto inject as k8s sidecars 
+    * Easy to deploy as a Docker container on the host for legacy VM workloads
 
 --
 
