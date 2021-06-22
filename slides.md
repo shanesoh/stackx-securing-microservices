@@ -307,12 +307,6 @@ allow = response {
 
 --
 
-* Purpose-built for sidecar usage
-    * Possible to auto inject as k8s sidecars 
-    * Easy to deploy as a Docker container on the host for legacy VM workloads
-
---
-
 * Future-proofing
     * Currently east-west traffic goes through API gateway which provides functionalities like traffic control and
       logging centrally
